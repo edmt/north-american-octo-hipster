@@ -8,6 +8,9 @@ import (
 	// Importa los drivers para la conexión con la base de datos
 	"database/sql"
 	_ "github.com/denisenkom/go-mssqldb"
+
+	// "reflect"
+	"encoding/json"
 )
 
 // Construye la cadena conexión basada en variables de entorno
@@ -52,6 +55,40 @@ func queryResultSet(db *sql.DB) {
 		}
 		log.Println(rfc, razonSocial)
 	}
+	err = rows.Err()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+// Realiza una consulta a la base de datos y recupera un conjunto de registros
+func queryJSON(db *sql.DB) {
+	rows, err := db.Query("select rfc, razonSocial from empresas where rfc = ?",
+		"AAA010101AAA")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	columns, _ := rows.Columns()
+ 	scanArgs := make([]interface{}, len(columns))
+    values   := make([]interface{}, len(columns))
+
+    for i := range values { scanArgs[i] = &values[i] }
+
+	for rows.Next() {
+        err = rows.Scan(scanArgs...)
+        record := make(map[string]interface{})
+
+        for i, col := range values {        
+        	record[columns[i]] = col
+        	//fmt.Printf("\n%s: type= %s %s\n", columns[i], reflect.TypeOf(col), col)
+        }
+        log.Print(record)
+        data, _ := json.Marshal(record)
+        log.Print(string(data))
+    }
+
 	err = rows.Err()
 	if err != nil {
 		log.Fatal(err)
@@ -134,7 +171,8 @@ func main() {
 	queryResultSet(db)
 	queryPreparedResultSet(db)
 	querySingleRow(db)
+	queryJSON(db)
 
 	// Modificación
-	execStatement(db)
+	// execStatement(db)
 }
