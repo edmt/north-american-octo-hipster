@@ -2,4 +2,6 @@
 
 ## Uso
 
-    $ env HOST=127.0.0.1 SQLUSER=hey SQLPASSWORD=hoo DATABASE=heyhoo go run goquery.go
+    $ env RGHOST=127.0.0.1 RGPORT=1433 RGSQLUSER=hey RGSQLPASSWORD=hoo RGDATABASE=heyhoo ./north_american_octo_hipster
+
+    $ curl localhost:4000 -XGET -H 'content-type: application/json' -d 'select top 1 * from table'
