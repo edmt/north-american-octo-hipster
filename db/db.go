@@ -1,28 +1,38 @@
-package main
+package db
 
 import (
-	"fmt"
-	"log"
-	"os"
-
-	// Importa los drivers para la conexión con la base de datos
 	"database/sql"
+	"fmt"
 	_ "github.com/denisenkom/go-mssqldb"
+	"log"
 )
 
-// Construye la cadena conexión basada en variables de entorno
-func makeConnectionString() string {
-	host := os.Getenv("HOST")
-	port := "1433"
-	user := os.Getenv("SQLUSER")
-	password := os.Getenv("SQLPASSWORD")
-	database := os.Getenv("DATABASE")
+type ConnectionParameters struct {
+	Host     string
+	Port     string
+	User     string
+	Password string
+	Database string
+}
+
+// Construye la cadena conexión
+func (cp ConnectionParameters) makeConnectionString() string {
 	return fmt.Sprintf("server=%s;port=%s;user id=%s;password=%s;database=%s;log=2",
-		host, port, user, password, database)
+		cp.Host, cp.Port, cp.User, cp.Password, cp.Database)
+}
+
+func (cp ConnectionParameters) MakeConnection() *sql.DB {
+	stringConnection := cp.makeConnectionString()
+	log.Print(stringConnection)
+	db, err := sql.Open("mssql", stringConnection)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return db
 }
 
 // Revisa que pueda acceder a la base de datos
-func ping(db *sql.DB) {
+func Ping(db *sql.DB) {
 	err := db.Ping()
 	if err == nil {
 		log.Print("Everything is ok")
@@ -56,6 +66,44 @@ func queryResultSet(db *sql.DB) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+// Realiza una consulta a la base de datos y recupera un conjunto de registros
+func Query(db *sql.DB, query string) []map[string]interface{} {
+	rows, err := db.Query(query)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	columns, _ := rows.Columns()
+	scanArgs := make([]interface{}, len(columns))
+	values := make([]interface{}, len(columns))
+
+	for i := range values {
+		scanArgs[i] = &values[i]
+	}
+
+	var records []map[string]interface{}
+
+	for rows.Next() {
+		err = rows.Scan(scanArgs...)
+		record := make(map[string]interface{})
+
+		for i, col := range values {
+			record[columns[i]] = col
+			//fmt.Printf("\n%s: type= %s %s\n", columns[i], reflect.TypeOf(col), col)
+		}
+		// data, _ := json.Marshal(record)
+		// log.Print(string(data))
+		records = append(records, record)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return records
 }
 
 // Realiza una consulta mediante una sentencia preparada
@@ -118,23 +166,4 @@ func execStatement(db *sql.DB) {
 		log.Fatal(err)
 	}
 	log.Printf("ID = %d, affected = %d\n", lastId, rowCount)
-}
-
-func main() {
-	db, err := sql.Open("mssql", makeConnectionString())
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	// Ping a la base de datos
-	ping(db)
-
-	// Lectura
-	queryResultSet(db)
-	queryPreparedResultSet(db)
-	querySingleRow(db)
-
-	// Modificación
-	execStatement(db)
 }
